@@ -4,7 +4,7 @@
 #include <setupapi.h>
 #include <iostream>
 
-int main()
+int main() //new comment :)
 {
 	HDEVINFO devInfo = SetupDiGetClassDevs(nullptr, TEXT("PCI"), NULL, DIGCF_PRESENT | DIGCF_ALLCLASSES);
 	if(devInfo == INVALID_HANDLE_VALUE)
