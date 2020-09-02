@@ -40,6 +40,8 @@ int main()
 			name = name.substr(0, name.size() - 7);
 		std::wcout << std::left << std::setw(120) << name << "\t";
 		std::wcout << std::left << std::setw(12) << ven <<  std::left << std::setw(12) << dev << std::endl;
+		SetupDiDeleteDeviceInfo(devInfo, &devInfoData);
 	}
+	SetupDiDestroyDeviceInfoList(devInfo);
 	system("pause");
 }
