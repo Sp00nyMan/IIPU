@@ -18,8 +18,10 @@ int main()
 		devInfoData.cbSize = sizeof(devInfoData);
 		if(SetupDiEnumDeviceInfo(devInfo, i, &devInfoData) == FALSE)
 			break;
-		SetupDiGetDeviceRegistryProperty(devInfo, &devInfoData, SPDRP_DEVICEDESC, &a, reinterpret_cast<BYTE*>(buffer), sizeof(buffer), &b);
-		std::cout << std::string(buffer, buffer + a) << std::endl;
+		memset(buffer, 0, sizeof(buffer));
+		SetupDiGetDeviceRegistryProperty(devInfo, &devInfoData, SPDRP_DEVICEDESC, &a, (BYTE*)buffer, sizeof(buffer), &b);
+		//std::cout << "Len = " << int(b) << std::endl;
+		std::cout << std::string(buffer, buffer + b) << std::endl;
 	}
 	system("pause");
 }
