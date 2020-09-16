@@ -90,6 +90,7 @@ int main() {
 	////f += sizeof(f);
 	//f1 = (STORAGE_HW_FIRMWARE_SLOT_INFO*)outBuffer;
 
+	CloseHandle(devHandle);
 
 	system("pause");
 	return 0;
