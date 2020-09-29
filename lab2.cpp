@@ -1,5 +1,6 @@
 #include <Windows.h>
 #include <Setupapi.h>
+#include <ntddscsi.h>
 #pragma comment(lib, "setupapi.lib")
 
 #include <iostream>
@@ -63,7 +64,68 @@ void getMemoryInfo()
 	std::cout << "\tСвободно: " << freeSpace.QuadPart / 1024.0 << std::endl;
 	std::cout << "\tЗанято: " << (totalSpace.QuadPart - freeSpace.QuadPart) / 1024.0 << " ("<< 100 - (double)freeSpace.QuadPart / totalSpace.QuadPart * 100 << "%)" << std::endl;
 }
+void getAtaPioDmaSupportStandarts(HANDLE diskHandle)
+{
+	UCHAR identifyDataBuffer[512 + sizeof(ATA_PASS_THROUGH_EX)] = { 0 };
 
+	ATA_PASS_THROUGH_EX &PTE = *(ATA_PASS_THROUGH_EX *)identifyDataBuffer;	//Структура для отправки АТА команды устройству 
+	PTE.Length = sizeof(PTE);
+	PTE.TimeOutValue = 10;									//Размер структуры 
+	PTE.DataTransferLength = 512;							//Размер буфера для данных 
+	PTE.DataBufferOffset = sizeof(ATA_PASS_THROUGH_EX);		//Смещение в байтах от начала структуры до буфера данных 
+	PTE.AtaFlags = ATA_FLAGS_DATA_IN;						//Флаг, говорящий о чтении байтов из устройства 
+
+	if (!DeviceIoControl(diskHandle,
+		IOCTL_ATA_PASS_THROUGH,								//посылаем структуру с командами типа ATA_PASS_THROUGH_EX
+		&PTE, 
+		sizeof(identifyDataBuffer), 
+		&PTE, 
+		sizeof(identifyDataBuffer), 
+		NULL,
+		NULL)) 
+	{
+		if(GetLastError() == 5)
+			std::cout << "Access denied!" << std::endl;
+		return;
+	}
+	
+	//Получаем указатель на массив полученных данных 
+	WORD *data = (WORD *)(identifyDataBuffer + sizeof(ATA_PASS_THROUGH_EX));	
+	int bitArray[16];
+
+
+	//Вывод поддерживаемых режимов DMA 
+	unsigned short dmaSupportedBytes = data[63];
+	//Превращаем байты с информацией о поддержке DMA в массив бит
+	for (int i = 15; i >= 0; --i)
+	{
+		bitArray[i] = dmaSupportedBytes & (int)pow(2, 15) ? 1 : 0;
+		dmaSupportedBytes = dmaSupportedBytes << 1;
+	}
+	
+	//Анализируем полученный массив бит
+	std::cout << "DMA Support: ";
+	for (int i = 0; i < 8; i++) 
+		if (bitArray[i])
+			std::cout << "DMA" << i << ", ";
+	std::cout << "\b\b" << std::endl;
+
+
+	unsigned short pioSupportedBytes = data[64];
+	//Превращаем байты с информацией о поддержке PIO в массив бит 
+	for (int i = 15; i >= 0; --i)
+	{
+		bitArray[i] = pioSupportedBytes & (int)pow(2, 15) ? 1 : 0;
+		pioSupportedBytes = pioSupportedBytes << 1;
+	}
+
+	//Анализируем полученный массив бит. 
+	std::cout << "PIO Support: ";
+	for (int i = 0; i < 2; i++)
+		if (bitArray[i]) 
+			std::cout << "PIO" << i + 3 << ", ";
+	std::cout << "\b\b" << std::endl;
+}
 int getDiskInfo(const char* name)
 {
 	STORAGE_PROPERTY_QUERY storagePropertyQuery;				//Структура с информацией об запросе 
@@ -79,7 +141,6 @@ int getDiskInfo(const char* name)
 		return GetLastError();
 	}
 
-
 	char *tmp = (char*)deviceDescriptor;
 
 	const std::string model(tmp + deviceDescriptor->ProductIdOffset);
@@ -89,8 +150,10 @@ int getDiskInfo(const char* name)
 	std::cout << "Серийный номер устройства: " << tmp + deviceDescriptor->SerialNumberOffset << std::endl;
 	std::cout << "Версия прошивки (firmware): " << tmp + deviceDescriptor->ProductRevisionOffset << std::endl;
 	std::cout << "Тип шины: " << busType[deviceDescriptor->BusType] << std::endl;
+	getAtaPioDmaSupportStandarts(diskHandle);
 
 	CloseHandle(diskHandle);
+	return 0;
 }
 
 int main() {
@@ -99,88 +162,4 @@ int main() {
 	getMemoryInfo();
 	system("pause");
 	return 0;
-	/*
-	HANDLE devHandle = CreateFileA("\\\\.\\PhysicalDrive0", 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
-	if (devHandle == INVALID_HANDLE_VALUE) {
-		return -1;
-	}
-
-	TCHAR buffer[1024];
-	DWORD bytesReturned;
-	memset(buffer, 0, sizeof(buffer));
-
-	STORAGE_PROPERTY_QUERY storagePropertyQuery;
-	STORAGE_DEVICE_DESCRIPTOR* storageDeviceDescriptor;
-	STORAGE_DESCRIPTOR_HEADER storageDescriptorHeader;
-	
-	ZeroMemory(&storagePropertyQuery, sizeof(storagePropertyQuery));
-	storagePropertyQuery.PropertyId = StorageDeviceProperty;
-	storagePropertyQuery.QueryType = PropertyStandardQuery;
-
-	
-	ZeroMemory(&storageDescriptorHeader, sizeof(storageDescriptorHeader));
-
-
-	if (!DeviceIoControl(devHandle, IOCTL_STORAGE_QUERY_PROPERTY, &storagePropertyQuery, sizeof(storagePropertyQuery), &storageDescriptorHeader, sizeof(storageDescriptorHeader), &bytesReturned, 0)) {
-		return GetLastError();
-	}
-
-	//const DWORD outBufferSize = storageDescriptorHeader.Size;
-	//BYTE* outBuffer = (BYTE*)malloc(outBufferSize);
-
-	char outBuffer[1024];
-
-	if (!DeviceIoControl(devHandle, IOCTL_STORAGE_QUERY_PROPERTY, &storagePropertyQuery, sizeof(storagePropertyQuery), outBuffer, 1024, &bytesReturned, 0)) {
-		return GetLastError();
-	}
-	storageDeviceDescriptor = (STORAGE_DEVICE_DESCRIPTOR*)outBuffer;
-
-	int offset = storageDeviceDescriptor->ProductIdOffset;
-	std::cout << "Название устройства: ";
-	while (outBuffer[offset] != '\0') {
-		std::cout << outBuffer[offset];
-		offset++;
-	}
-	std::cout << std::endl;
-
-	offset = storageDeviceDescriptor->SerialNumberOffset;
-	std::cout << "Серийный номер устройства: ";
-	while (outBuffer[offset+1] != '\0') {
-		std::cout << outBuffer[offset];
-		offset++;
-	}
-	std::cout << std::endl;
-
-	offset = storageDeviceDescriptor->ProductRevisionOffset;
-	std::cout << "Версия прошивки (firmware): ";
-	while (outBuffer[offset] != '\0') {
-		std::cout << outBuffer[offset];
-		offset++;
-	}
-	std::cout << std::endl;
-
-	//STORAGE_HW_FIRMWARE_INFO_QUERY s;
-	//STORAGE_HW_FIRMWARE_INFO* f;
-	//STORAGE_HW_FIRMWARE_SLOT_INFO* f1;
-	//ZeroMemory(&s, sizeof(s));
-
-	//memset(outBuffer, '\0', 1024);
-
-	//ZeroMemory(&storagePropertyQuery, sizeof(storagePropertyQuery));
-	//storagePropertyQuery.PropertyId = StorageDeviceProperty;
-	//storagePropertyQuery.QueryType = PropertyStandardQuery;
-
-	//if (!DeviceIoControl(devHandle, IOCTL_STORAGE_FIRMWARE_GET_INFO, &s, sizeof(s), outBuffer, 1024, &bytesReturned, 0)) {
-	//	return GetLastError();
-	//}
-
-	////f = (STORAGE_HW_FIRMWARE_INFO*)outBuffer;
-	////f += sizeof(f);
-	//f1 = (STORAGE_HW_FIRMWARE_SLOT_INFO*)outBuffer;
-
-	CloseHandle(devHandle);
-
-	system("pause");
-	return 0;
-	*/
 }
