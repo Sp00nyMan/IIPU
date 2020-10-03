@@ -1,4 +1,6 @@
 *
 
 !.gitignore
+!Lab3.cpp
+!Lab2.cpp
 !Lab1.cpp
