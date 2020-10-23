@@ -1,6 +1,8 @@
-*
+/*
 
 !.gitignore
+!Lab4.cpp
 !Lab3.cpp
 !Lab2.cpp
 !Lab1.cpp
+!/opecv/
