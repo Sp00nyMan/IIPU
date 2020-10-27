@@ -1,11 +1,14 @@
 #define WIN32_LEAN_AND_MEAN
 #pragma comment(lib, "setupapi.lib")
 #include "opencv2/opencv.hpp"
+
 #include <Windows.h>
 #include <conio.h>
+
 #include <Setupapi.h>
-#include <iostream>
 #include <devguid.h>
+
+#include <iostream>
 
 HWND hWnd;
 HHOOK g_hHook;
@@ -17,23 +20,22 @@ bool hideFlag = false;
 void takePhoto()
 {
 	isCameraInUse = true;
-	char filenamePhoto[100];
 	cv::Mat frame;
 	cv::VideoCapture vcap(0);
 
 	if(!vcap.isOpened())
 	{
-		std::cout << "Error! Unable to open camera" << std::endl;
+		std::cerr << "Error! Unable to open camera" << std::endl;
 		return;
 	}
 
 	vcap >> frame;
 	if(!frame.empty())
 	{
-		sprintf_s(filenamePhoto, "data\\Photo_%d.jpg", photoNumber);
-		imwrite(filenamePhoto, frame);
+		const std::string filename("data\\Photo_" + std::to_string(photoNumber) + ".jpg");
+		imwrite(filename, frame);
 	}
-
+	system("CLS");
 	photoNumber++;
 	std::cout << "The photo was taken" << std::endl;
 	isCameraInUse = false;
@@ -43,7 +45,6 @@ void takePhoto()
 void recordVideo()
 {
 	isCameraInUse = true;
-	char filenameVideo[100];
 
 	cv::Mat frame;
 	cv::VideoCapture vcap;
@@ -54,20 +55,18 @@ void recordVideo()
 		std::cout << "Error! Unable to open camera" << std::endl;
 		return;
 	}
-	system("CLS");
-	std::cout << "Start recording the video..." << std::endl;
 	const int frame_width = vcap.get(cv::CAP_PROP_FRAME_WIDTH);
 	const int frame_height = vcap.get(cv::CAP_PROP_FRAME_HEIGHT);
-	sprintf_s(filenameVideo, "data\\Video_%d.avi", videoNumber);
+	const std::string filename("data\\Video_" + std::to_string(videoNumber) + ".avi");
 
-	cv::VideoWriter video(filenameVideo, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), 10, cv::Size(frame_width, frame_height),
-						  true);
-
+	cv::VideoWriter video(filename, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), 10, cv::Size(frame_width, frame_height));
+															//motion-jpeg codec
+	system("CLS");
+	std::cout << "Start recording the video..." << std::endl;
 	for(int i = 0; i < 70; i++)
 	{
 		vcap >> frame;
 		video.write(frame);
-		cv::waitKey(33);
 	}
 
 	videoNumber++;
