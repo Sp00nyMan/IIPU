@@ -33,6 +33,7 @@ void takePhoto()
 	if(!frame.empty())
 	{
 		const std::string filename("data\\Photo_" + std::to_string(photoNumber) + ".jpg");
+		cv::waitKey(10);
 		imwrite(filename, frame);
 	}
 	system("CLS");
@@ -66,6 +67,7 @@ void recordVideo()
 	for(int i = 0; i < 70; i++)
 	{
 		vcap >> frame;
+		cv::waitKey(33);
 		video.write(frame);
 	}
 
