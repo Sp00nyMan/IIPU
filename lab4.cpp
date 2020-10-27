@@ -157,15 +157,12 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
 				hideFlag = false;
 				break;
 			case 'P':
-				isCameraInUse = true;
 				takePhoto();
-				isCameraInUse = false;
 				break;
 			case 'V':
 				if(hideFlag)
 					break;
 				recordVideo();
-				isCameraInUse = false;
 				break;
 			}
 			system("cls");
