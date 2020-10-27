@@ -1,202 +1,188 @@
-#define _CRT_SECURE_NO_WARNINGS
-
+#define WIN32_LEAN_AND_MEAN
+#pragma comment(lib, "setupapi.lib")
+#include "opencv2/opencv.hpp"
 #include <Windows.h>
+#include <conio.h>
+#include <Setupapi.h>
 #include <iostream>
 #include <devguid.h>
-#include <SetupAPI.h>
-#include <conio.h>
-#include <opencv2/opencv.hpp>
-#include <opencv2/videoio.hpp>
 
-#pragma comment (lib, "Setupapi.lib")
-HHOOK hHook(NULL);
+HWND hWnd;
+HHOOK g_hHook;
+int photoNumber = 1;
+int videoNumber = 1;
+bool isCameraInUse = false;
+bool hideFlag = false;
 
-HWND FRAME_WINDOW;
-bool RECORDING = false;
-bool EXIT = false;
-bool Hide = false;
-bool CAPTURE = false;
-int COUNT = 0;
-
-void showInstructions();
-void makePhoto();
-void makeVideo();
-void printCameraInfo();
-LRESULT CALLBACK myLowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam);
-
-
-int main()
+void takePhoto()
 {
+	isCameraInUse = true;
+	char filenamePhoto[100];
+	cv::Mat frame;
 	cv::VideoCapture vcap(0);
-
-	hHook = SetWindowsHookEx(WH_KEYBOARD_LL, myLowLevelKeyboardProc, NULL, 0);
 
 	if(!vcap.isOpened())
 	{
-		std::cout << "Error opening video stream or file" << std::endl;
-		return -1;
+		std::cout << "Error! Unable to open camera" << std::endl;
+		return;
 	}
 
-	int frameWidth = vcap.get(cv::CAP_PROP_FRAME_WIDTH);
-	int frameHeight = vcap.get(cv::CAP_PROP_FRAME_HEIGHT);
-
-	char filename[30];
-	printCameraInfo();
-	showInstructions();
-
-	vcap.~VideoCapture();
-	for(int i = 0;; i++)
+	vcap >> frame;
+	if(!frame.empty())
 	{
-		if(i == 0)
-			FRAME_WINDOW = GetForegroundWindow();
-
-		cv::waitKey(33);
-		if(EXIT)
-			break;
-		if(RECORDING && !Hide)
-		{
-			makeVideo();
-			RECORDING = false;
-		}
-		if(RECORDING && Hide)
-		{
-			RECORDING = false;
-		}
-
-		if(CAPTURE)
-			makePhoto();
+		sprintf_s(filenamePhoto, "data\\Photo_%d.jpg", photoNumber);
+		imwrite(filenamePhoto, frame);
 	}
-	return 0;
+
+	photoNumber++;
+	std::cout << "The photo was taken" << std::endl;
+	isCameraInUse = false;
+	Sleep(1000);
 }
 
-void makePhoto()
+void recordVideo()
 {
-	static int number = 0;
-	number++;
+	isCameraInUse = true;
+	char filenameVideo[100];
 
-	cv::VideoCapture cap(0);
-	system("CLS");
+	cv::Mat frame;
+	cv::VideoCapture vcap;
 
-	if(cap.isOpened())
+	vcap.open(0);
+	if(!vcap.isOpened())
 	{
-		cv::Mat img;
-		cap >> img;
-		if(!img.empty())
-		{
-			char fileName[1000];
-			sprintf_s(fileName, "data\\photo %d.jpg", number);
-			imwrite(fileName, img);
-		}
+		std::cout << "Error! Unable to open camera" << std::endl;
+		return;
 	}
-
 	system("CLS");
-	std::cout << "Photo was made." << std::endl << std::endl;
-	CAPTURE = false;
-	showInstructions();
+	std::cout << "Start recording the video..." << std::endl;
+	const int frame_width = vcap.get(cv::CAP_PROP_FRAME_WIDTH);
+	const int frame_height = vcap.get(cv::CAP_PROP_FRAME_HEIGHT);
+	sprintf_s(filenameVideo, "data\\Video_%d.avi", videoNumber);
 
-	cap.~VideoCapture();
-}
+	cv::VideoWriter video(filenameVideo, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), 10, cv::Size(frame_width, frame_height),
+						  true);
 
-void makeVideo()
-{
-	static int number = 0;
-	number++;
-	long videoLenght;
-	std::cout << "Video lenght in seconds: ";
-	std::cin >> videoLenght;
-	long long curFrame = 0;
-	auto prevClock = clock();
-
-	char fileName[1000];
-	sprintf_s(fileName, "data\\video %d.avi", number);
-
-	cv::VideoCapture cap(0);
-
-	system("CLS");
-
-	double dWidth = cap.get(cv::CAP_PROP_FRAME_WIDTH);
-	double dHeight = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
-
-	cv::VideoWriter video(fileName, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), 10, cv::Size(dWidth, dHeight));
-	while(curFrame < videoLenght * 10)
+	for(int i = 0; i < 70; i++)
 	{
-		while(clock() - prevClock < 100);
-		prevClock = clock();
-		curFrame++;
-
-		cv::Mat frame;
-		cap >> frame;
-		if(frame.empty())
-			break;
+		vcap >> frame;
 		video.write(frame);
+		cv::waitKey(33);
 	}
 
-	cap.release();
-	video.release();
-
-	system("CLS");
-	std::cout << "Video was made." << std::endl << std::endl;
-	cap.~VideoCapture();
-	showInstructions();
+	videoNumber++;
+	std::cout << "The video was recorded" << std::endl;
+	isCameraInUse = false;
+	Sleep(1000);
 }
 
-LRESULT CALLBACK myLowLevelKeyboardProc(const int nCode, const WPARAM wParam, const LPARAM lParam)
+void camInfo()
 {
-	switch(wParam)
+	setlocale(LC_ALL, "Russian");
+	HDEVINFO devInfo = SetupDiGetClassDevsA(&GUID_DEVCLASS_CAMERA, "USB", NULL, DIGCF_PRESENT);
+	if(devInfo == INVALID_HANDLE_VALUE)
+		return;
+
+	SP_DEVINFO_DATA devInfoData;
+	TCHAR buffer[1024];
+
+	char instanceIDBuffer[1024];
+
+	for(int i = 0; ; i++)
 	{
-		case WM_KEYDOWN:
-			KBDLLHOOKSTRUCT* k = (KBDLLHOOKSTRUCT*)lParam;
-			if(k->vkCode == VK_F1)
-			{
-				ShowWindow(FindWindowA("ConsoleWindowClass", NULL), SW_HIDE);
-				ShowWindow(FRAME_WINDOW, SW_HIDE);
-				Hide = true;
-			}
-			if(k->vkCode == VK_F2)
-			{
-				ShowWindow(FindWindowA("ConsoleWindowClass", NULL), SW_SHOW);
-				ShowWindow(FRAME_WINDOW, SW_SHOW);
-				Hide = false;
-			}
-			if(k->vkCode == VK_F3)
-				RECORDING = true;
-			if(k->vkCode == VK_ESCAPE)
-			{
-				if(COUNT == 1)
-					RECORDING = false;
-				else
-					EXIT = true;
-			}
-			if(k->vkCode == VK_F4)
-				CAPTURE = true;
+		devInfoData.cbSize = sizeof(devInfoData);
+		if(SetupDiEnumDeviceInfo(devInfo, i, &devInfoData) == FALSE)
 			break;
+
+		memset(buffer, 0, sizeof(buffer));
+		SetupDiGetDeviceRegistryProperty(devInfo, &devInfoData, SPDRP_DEVICEDESC, NULL, (BYTE*)buffer, 1024, NULL);
+		std::wstring name(buffer);
+
+		memset(buffer, 0, sizeof(buffer));
+		SetupDiGetDeviceRegistryProperty(devInfo, &devInfoData, SPDRP_HARDWAREID, NULL, (BYTE*)buffer, 1024, NULL);
+		std::wstring ids(buffer);
+
+		std::wstring ven(ids.substr(ids.find(L"VID_") + 4, 4));
+		std::wstring dev(ids.substr(ids.find(L"PID_") + 4, 4));
+
+		memset(buffer, 0, sizeof(buffer));
+		SetupDiGetDeviceInstanceIdA(devInfo, &devInfoData, (PSTR)instanceIDBuffer, 1024, NULL);
+		std::string instanceID(instanceIDBuffer);
+
+		if(name.substr(name.size() - 4, 4) == dev)
+			name = name.substr(0, name.size() - 7);
+
+		std::cout << "Information about camera:" << std::endl;
+		std::wcout << L"Name: " << name << std::endl;
+		std::wcout << L"Vendor ID: " << ven << std::endl;
+		std::wcout << L"Device ID: " << dev << std::endl;
+		std::cout << "Instance ID: " << instanceID << std::endl;
+
+		SetupDiDeleteDeviceInfo(devInfo, &devInfoData);
 	}
-	return CallNextHookEx(hHook, nCode, wParam, lParam);
+	SetupDiDestroyDeviceInfoList(devInfo);
 }
 
-void showInstructions()
+void menu()
 {
-	std::cout << "Menu"<< std::endl;
-
-	std::cout << "F1 to hide program;"			<< std::endl << 
-				 "F2 to show program;"			<< std::endl << 
-				 "F3 for starting recording;"	<< std::endl <<
-				 "F4 for taking a photo;"		<< std::endl <<
-				 "Esc to exit"					<< std::endl;
+	std::cout << "===================Lab 4==================" << std::endl;
+	camInfo();
+	std::cout << "==========================================" << std::endl
+		<< "Choose an option:" << std::endl
+		<< "h - hide window" << std::endl
+		<< "s - show window" << std::endl
+		<< "p - make a photo" << std::endl
+		<< "v - make a video" << std::endl
+		<< "esc - exit" << std::endl;
 }
 
-void printCameraInfo()
+LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
-	SP_DEVINFO_DATA DeviceInfoData = {0};
-	HDEVINFO DeviceInfoSet = SetupDiGetClassDevsA(&GUID_DEVCLASS_CAMERA, "USB", NULL, DIGCF_PRESENT);
-	if(DeviceInfoSet == INVALID_HANDLE_VALUE)
-		exit(1);
-	DeviceInfoData.cbSize = sizeof(SP_DEVINFO_DATA);
+	if(nCode >= 0)
+	{
+		if(wParam == WM_KEYDOWN && !isCameraInUse)
+		{
+			KBDLLHOOKSTRUCT* pkhs = (KBDLLHOOKSTRUCT*)lParam;
+			switch(pkhs->vkCode)
+			{
+			case VK_ESCAPE:
+				PostQuitMessage(0);
+				break;
+			case 'H':
+				ShowWindow(hWnd, SW_HIDE);
+				hideFlag = true;
+				break;
+			case 'S':
+				ShowWindow(hWnd, SW_RESTORE);
+				hideFlag = false;
+				break;
+			case 'P':
+				isCameraInUse = true;
+				takePhoto();
+				isCameraInUse = false;
+				break;
+			case 'V':
+				if(hideFlag)
+					break;
+				recordVideo();
+				isCameraInUse = false;
+				break;
+			}
+			system("cls");
+			menu();
+		}
+	}
 
-	SetupDiEnumDeviceInfo(DeviceInfoSet, 0, &DeviceInfoData);
-	char deviceName[256];
-	SetupDiGetDeviceRegistryPropertyA(DeviceInfoSet, &DeviceInfoData, SPDRP_FRIENDLYNAME, NULL, (PBYTE)deviceName,
-									  sizeof(deviceName), 0);
-	SetupDiDestroyDeviceInfoList(DeviceInfoSet);
-	std::cout << "Name: " << deviceName << std::endl;
+	return CallNextHookEx(nullptr, nCode, wParam, lParam);
+}
+
+int main()
+{
+	menu();
+	hWnd = GetConsoleWindow();
+	g_hHook = SetWindowsHookEx(WH_KEYBOARD_LL, LowLevelKeyboardProc, nullptr, 0);
+	MSG msg;
+	GetMessage(&msg, nullptr, 0, 0);
+	UnhookWindowsHookEx(g_hHook);
+	return 0;
 }
