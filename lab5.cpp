@@ -2,9 +2,8 @@
 #include <Windows.h>
 #include <Setupapi.h>
 #include <iostream>
-#include <regex>
-#include <iomanip>
 #include <conio.h>
+#include <Cfgmgr32.h>
 
 using namespace std;
 
@@ -39,8 +38,15 @@ DWORD WINAPI batteryStatusThread(PVOID param) {
 			SetupDiGetDeviceRegistryProperty(devInfo, &devInfoData, SPDRP_DEVICEDESC, NULL, (BYTE*)buffer, 1024, NULL);
 			std::wstring name(buffer);
 
-			std::wcout << name << std::endl;
-			SetupDiDeleteDeviceInfo(devInfo, &devInfoData);
+			memset(buffer, 0, sizeof(buffer));
+			SetupDiGetDeviceRegistryProperty(devInfo, &devInfoData, SPDRP_REMOVAL_POLICY, NULL, (BYTE*)buffer, 1024, NULL);
+			DWORD* type;
+			type = (DWORD*)buffer;
+			if (*type == CM_REMOVAL_POLICY_EXPECT_SURPRISE_REMOVAL || *type == CM_REMOVAL_POLICY_EXPECT_ORDERLY_REMOVAL) {
+				std::wcout << name << std::endl;
+			}
+
+			//SetupDiDeleteDeviceInfo(devInfo, &devInfoData); // OTHERWISE NOT ALL USB DEVICES ARE BEING SHOWN
 		}
 		SetupDiDestroyDeviceInfoList(devInfo);
 		Sleep(100);
@@ -50,6 +56,14 @@ DWORD WINAPI batteryStatusThread(PVOID param) {
 int main()
 {
 	HANDLE thread;
+
+	HDEVINFO devInfo;
+	SP_DEVINFO_DATA devInfoData;
+	TCHAR buffer[1024];
+	char userInput = 0;
+
+	setlocale(LC_ALL, "Russian");
+
 	thread = CreateThread(NULL, 0, batteryStatusThread, NULL, 0, NULL);
 	if (thread == NULL) {
 		std::cout << "Cannot create event." << std::endl;
