@@ -42,7 +42,7 @@ public:
 
 	bool operator ==(const Device& other) const;
 
-	bool isEjectable() const { return this->ejectable; }
+	bool isEjectable() const;
 
 	bool eject() const;
 
