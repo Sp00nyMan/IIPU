@@ -52,6 +52,8 @@ bool Device::operator ==(const Device& other) const
 	return this->pid == other.pid;
 }
 
+bool Device::isEjectable() const { return this->ejectable; }
+
 bool Device::eject() const
 {
 	if (CM_Request_Device_EjectW(this->devInst, nullptr, nullptr, NULL, NULL) == CR_SUCCESS)
