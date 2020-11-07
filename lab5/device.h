@@ -4,13 +4,9 @@
 #include <Windows.h>
 #include <Setupapi.h>
 #include <iostream>
-#include <conio.h>
 #include <Cfgmgr32.h>
 #include <vector>
-#include <iomanip>
 #include <string>
-#include <initguid.h>
-#include <Usbiodef.h>
 #include <dbt.h>
 
 class Device
