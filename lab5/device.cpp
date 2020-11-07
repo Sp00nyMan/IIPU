@@ -9,8 +9,7 @@ name(name)
 Device::Device(PDEV_BROADCAST_DEVICEINTERFACE_A info)
 {
 	HDEVINFO deviceList = SetupDiCreateDeviceInfoList(nullptr, nullptr);
-	SP_DEVICE_INTERFACE_DATA deviceInterfaceData;
-	SetupDiOpenDeviceInterfaceW(deviceList, (LPCWSTR)info->dbcc_name, NULL, &deviceInterfaceData);
+	SetupDiOpenDeviceInterfaceW(deviceList, (LPCWSTR)info->dbcc_name, NULL, NULL);
 
 	SP_DEVINFO_DATA deviceInfo;
 	ZeroMemory(&deviceInfo, sizeof(SP_DEVINFO_DATA));
@@ -30,7 +29,7 @@ Device::Device(HDEVINFO deviceList, SP_DEVINFO_DATA devInfoData)
 	ZeroMemory(buffer, sizeof(buffer));
 	SetupDiGetDeviceRegistryProperty(deviceList, &devInfoData, SPDRP_HARDWAREID, nullptr, (BYTE*)buffer, 1024, nullptr);
 	this->HARDWARE_ID = std::wstring(buffer);
-	if (!this->HARDWARE_ID.empty())
+	if (!this->HARDWARE_ID.empty() && (HARDWARE_ID.find(L"PID_") != -1))
 		this->pid = HARDWARE_ID.substr(HARDWARE_ID.find(L"PID_") + 4, 4);
 
 	DWORD properties;
