@@ -8,6 +8,8 @@
 #include <vector>
 #include <string>
 #include <dbt.h>
+#include <initguid.h>
+#include <Usbiodef.h>
 
 class Device
 {
@@ -16,6 +18,9 @@ class Device
 	std::wstring pid;
 	bool ejectable;
 	DEVINST devInst;
+	HDEVNOTIFY notificationHandle;
+	HANDLE deviceHandle;
+	std::wstring devicePath;
 public:
 	static std::vector<Device> devices;
 	static Device remove(const Device& device)
@@ -30,7 +35,11 @@ public:
 
 	Device(PDEV_BROADCAST_DEVICEINTERFACE_A info);
 
-	Device(HDEVINFO deviceList, SP_DEVINFO_DATA deviceInfo);
+	Device(PDEV_BROADCAST_DEVICEINTERFACE_A info, PDEV_BROADCAST_DEVICEINTERFACE devBroadcastDeviceInterface, HWND hwnd);
+
+	Device(HDEVINFO deviceList, SP_DEVINFO_DATA devInfoData);
+
+	Device(HDEVINFO deviceList, SP_DEVINFO_DATA devInfoData, HWND hwnd);
 
 	Device(const Device& other);
 
@@ -38,9 +47,16 @@ public:
 
 	bool isEjectable() const;
 
-	bool eject() const;
+	bool eject(HWND hwnd, int i);
 
 	void print() const;
+
+	void close() {
+		UnregisterDeviceNotification(notificationHandle);
+		
+		notificationHandle = NULL;
+		deviceHandle = NULL;
+	}
 
 	std::wstring getName() const;
 };
