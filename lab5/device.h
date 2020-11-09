@@ -13,34 +13,32 @@ class Device
 {
 	std::wstring HARDWARE_ID;
 	std::wstring name;
+	std::wstring devicePath;
 	std::wstring pid;
 	bool ejectable;
 	DEVINST devInst;
+
+	HDEVNOTIFY notificationHandle;
+	void register_handle(HWND hWnd);
+	void unregister() const;
 public:
 	static std::vector<Device> devices;
-	static Device remove(const Device& device)
-	{
-		for (size_t i = 0; i < devices.size(); i++)
-			if (device == devices[i])
-			{
-				devices.erase(devices.begin() + i);
-				return device;
-			}
-	}
 
-	Device(PDEV_BROADCAST_DEVICEINTERFACE_A info);
+	static void remove(const Device& device);
 
-	Device(HDEVINFO deviceList, SP_DEVINFO_DATA deviceInfo);
+	Device(PDEV_BROADCAST_DEVICEINTERFACE_A info, HWND hWnd = nullptr);
+
+	Device(HDEVINFO deviceList, SP_DEVINFO_DATA deviceInfo, HWND hWnd);
 
 	Device(const Device& other);
 
-	bool operator ==(const Device& other) const;
+	bool operator ==(const Device& other) const { return this->pid == other.pid; }
 
-	bool isEjectable() const;
+	bool isEjectable() const { return this->ejectable; }
 
-	bool eject() const;
+	void eject() const;
 
 	void print() const;
 
-	std::wstring getName() const;
+	std::wstring getName() const { return name; };
 };

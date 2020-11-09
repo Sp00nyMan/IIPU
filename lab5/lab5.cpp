@@ -4,16 +4,15 @@
 #include <Usbiodef.h>
 
 void printMenu() {
-	std::cout << "=======================Lab 5=======================" << std::endl << std::endl;
-	std::cout << ">Press q to exit" << std::endl;
-	std::cout << ">Enter the number of the device to remove it" << std::endl << std::endl;
-	std::cout << "==The list of connected USB devices (№/name/PID):==" << std::endl << std::endl;
+	std::cout << "> Press \"q\" to exit" << std::endl;
+	std::cout << "> Enter the number of the device to safely remove it" << std::endl << std::endl;
+	std::cout << "The list of connected USB devices:" << std::endl << std::endl;
 }
 void printDevices()
 {
 	for (int i = 0; i < Device::devices.size(); i++)
 	{
-		std::cout << i + 1 << " ";
+		std::cout << i + 1 << ". ";
 		Device::devices[i].print();
 		std::cout << std::endl;
 	}
@@ -29,22 +28,17 @@ LRESULT FAR PASCAL WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 		{
 			case DBT_DEVICEARRIVAL:
 			{
-				Device device((PDEV_BROADCAST_DEVICEINTERFACE_A)lParam);
+				Device device((PDEV_BROADCAST_DEVICEINTERFACE_A)lParam, hWnd);
 				if (device.getName().empty())
 					break;
 				Device::devices.push_back(device);
 
-				system("cls");
+				system("CLS");
 				Device::devices[Device::devices.size() - 1].print();
 				std::cout << " connected" << std::endl;
 
 				printMenu();
-				for (int i = 0; i < Device::devices.size(); i++)
-				{
-					std::cout << i + 1 << " ";
-					Device::devices[i].print();
-					std::cout << std::endl;
-				}
+				printDevices();
 				break;
 			}
 			case DBT_DEVICEREMOVECOMPLETE:
@@ -54,25 +48,34 @@ LRESULT FAR PASCAL WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 					break;
 				Device::remove(device);
 
-				system("cls");
+				system("CLS");
 				device.print();
 				std::cout << " disconnected" << std::endl;
 
 				printMenu();
-				for (int i = 0; i < Device::devices.size(); i++)
-				{
-					std::cout << i + 1 << " ";
-					Device::devices[i].print();
-					std::cout << std::endl;
-				}
+				printDevices();
 				break;
 			}
 			case DBT_DEVICEQUERYREMOVE:
-				std::cout << "Tryed to remove" << std::endl;
+			{
+				system("CLS");
+				std::cout << "Tring to remove ";
+				Device((PDEV_BROADCAST_DEVICEINTERFACE_A)lParam).print();
+				std::cout << " safely..." << std::endl;
+				printMenu();
+				printDevices();
 				break;
+			}
 			case DBT_DEVICEQUERYREMOVEFAILED:
-				std::cout << "Failed to remove" << std::endl;
+			{
+				system("CLS");
+				std::cout << "Failed to remove ";
+				Device((PDEV_BROADCAST_DEVICEINTERFACE_A)lParam).print();
+				std::cout << " safely" << std::endl;
+				printMenu();
+				printDevices();
 				break;
+			}
 		}
 	}
 	return DefWindowProc(hWnd, message, wParam, lParam);
@@ -112,8 +115,7 @@ DWORD WINAPI initialisationThread(void*)
 		devInfoData.cbSize = sizeof(devInfoData);
 		if (SetupDiEnumDeviceInfo(deviceInfoSet, i, &devInfoData) == FALSE)
 			break;
-		Device device = Device(deviceInfoSet, devInfoData);
-
+		Device device(deviceInfoSet, devInfoData, hWnd);
 		if (device.isEjectable())
 		{
 			Device::devices.push_back(device);
@@ -154,7 +156,7 @@ int main()
 	while (true)
 	{
 		rewind(stdin);
-		char ch = _getch();
+		const char ch = _getch();
 
 		if (exitFlag) {
 			WaitForSingleObject(thread, INFINITE);
@@ -163,21 +165,14 @@ int main()
 		}
 		if (ch >= '1' && ch <= '9')
 		{
-
-			if ((ch - '0') <= Device::devices.size()) {
-				Device device = Device::devices[ch - '0' - 1];
-				if (device.isEjectable()) {
-					if (!device.eject()) {
-						system("cls");
-						std::cout << "Cannot eject the device." << std::endl;
-
-						printMenu();
-						printDevices();
-					}
-				}
-
-				else {
-					system("cls");
+			if (ch - '0' <= Device::devices.size()) 
+			{
+				Device& device = Device::devices[ch - '0' - 1];
+				if (device.isEjectable()) 
+					device.eject();
+				else 
+				{
+					system("CLS");
 					std::cout << "Device isn't removable." << std::endl;
 
 					printMenu();
@@ -190,6 +185,8 @@ int main()
 			exitFlag = true;
 			WaitForSingleObject(thread, INFINITE);
 			CloseHandle(thread);
+			for (const Device& device : Device::devices)
+				Device::remove(device);
 			break;
 		}
 	}
