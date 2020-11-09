@@ -9,64 +9,70 @@ void printMenu() {
 	std::cout << ">Enter the number of the device to remove it" << std::endl << std::endl;
 	std::cout << "==The list of connected USB devices (№/name/PID):==" << std::endl << std::endl;
 }
-
+void printDevices()
+{
+	for (int i = 0; i < Device::devices.size(); i++)
+	{
+		std::cout << i + 1 << " ";
+		Device::devices[i].print();
+		std::cout << std::endl;
+	}
+}
 std::vector<Device> Device::devices;
 bool exitFlag = false;
 
 LRESULT FAR PASCAL WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	if (message == WM_DEVICECHANGE) //https://docs.microsoft.com/en-us/windows/win32/devio/wm-devicechange
+	if (message == WM_DEVICECHANGE)
 	{
 		switch (wParam)
 		{
-		case DBT_DEVICEARRIVAL:
-		{
-			Device device((PDEV_BROADCAST_DEVICEINTERFACE_A)lParam);
-			if (device.getName().empty())
-				break;
-			Device::devices.push_back(device);
-
-			system("cls");
-			Device::devices[Device::devices.size() - 1].print();
-			std::cout << " connected" << std::endl;
-
-			printMenu();
-			for (int i = 0; i < Device::devices.size(); i++)
+			case DBT_DEVICEARRIVAL:
 			{
-				std::cout << i + 1 << " ";
-				Device::devices[i].print();
-				std::cout << std::endl;
-			}
-		}
-		break;
-		case DBT_DEVICEREMOVECOMPLETE:
-		{
-			Device device((PDEV_BROADCAST_DEVICEINTERFACE_A)lParam);
-			if (device.getName().empty())
+				Device device((PDEV_BROADCAST_DEVICEINTERFACE_A)lParam);
+				if (device.getName().empty())
+					break;
+				Device::devices.push_back(device);
+
+				system("cls");
+				Device::devices[Device::devices.size() - 1].print();
+				std::cout << " connected" << std::endl;
+
+				printMenu();
+				for (int i = 0; i < Device::devices.size(); i++)
+				{
+					std::cout << i + 1 << " ";
+					Device::devices[i].print();
+					std::cout << std::endl;
+				}
 				break;
-			Device::remove(device);
-
-			system("cls");
-			device.print();
-			std::cout << " disconnected" << std::endl;
-
-			printMenu();
-			for (int i = 0; i < Device::devices.size(); i++)
-			{
-				std::cout << i + 1 << " ";
-				Device::devices[i].print();
-				std::cout << std::endl;
 			}
-			break;
-		}
-		case DBT_DEVICEQUERYREMOVE:
-			std::cout << "Tryed to remove" << std::endl;
-			break;
-		case DBT_DEVICEQUERYREMOVEFAILED:
-			std::cout << "Failed to remove" << std::endl;
-			break;
-		default:
-			break;
+			case DBT_DEVICEREMOVECOMPLETE:
+			{
+				Device device((PDEV_BROADCAST_DEVICEINTERFACE_A)lParam);
+				if (device.getName().empty())
+					break;
+				Device::remove(device);
+
+				system("cls");
+				device.print();
+				std::cout << " disconnected" << std::endl;
+
+				printMenu();
+				for (int i = 0; i < Device::devices.size(); i++)
+				{
+					std::cout << i + 1 << " ";
+					Device::devices[i].print();
+					std::cout << std::endl;
+				}
+				break;
+			}
+			case DBT_DEVICEQUERYREMOVE:
+				std::cout << "Tryed to remove" << std::endl;
+				break;
+			case DBT_DEVICEQUERYREMOVEFAILED:
+				std::cout << "Failed to remove" << std::endl;
+				break;
 		}
 	}
 	return DefWindowProc(hWnd, message, wParam, lParam);
@@ -81,15 +87,15 @@ DWORD WINAPI initialisationThread(void*)
 	wx.lpszClassName = L"NONE";
 
 	HWND hWnd = NULL;
-	GUID guid = GUID_DEVINTERFACE_USB_DEVICE; //https://docs.microsoft.com/en-us/windows/win32/api/guiddef/ns-guiddef-guid
-	if (RegisterClassExW(&wx)) //https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-registerclassexw
+	GUID guid = GUID_DEVINTERFACE_USB_DEVICE;
+	if (RegisterClassExW(&wx))
 		hWnd = CreateWindowA("NONE", "DevNotifWnd", WS_ICONIC, 0, 0, CW_USEDEFAULT, 0, 0, NULL, GetModuleHandle(nullptr), (void*)&guid);
 
-	DEV_BROADCAST_DEVICEINTERFACE_A filter; //https://docs.microsoft.com/en-us/windows/win32/api/dbt/ns-dbt-dev_broadcast_deviceinterface_a
+	DEV_BROADCAST_DEVICEINTERFACE_A filter;
 	filter.dbcc_size = sizeof(filter);
 	filter.dbcc_classguid = guid;
 	filter.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
-	RegisterDeviceNotificationA(hWnd, &filter, DEVICE_NOTIFY_WINDOW_HANDLE); //https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-registerdevicenotificationw
+	RegisterDeviceNotificationA(hWnd, &filter, DEVICE_NOTIFY_WINDOW_HANDLE);
 
 	SP_DEVINFO_DATA devInfoData;
 	const HDEVINFO deviceInfoSet = SetupDiGetClassDevsA(&GUID_DEVINTERFACE_USB_DEVICE, nullptr, nullptr, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
@@ -119,19 +125,18 @@ DWORD WINAPI initialisationThread(void*)
 	}
 	SetupDiDestroyDeviceInfoList(deviceInfoSet);
 
-	MSG msg; //https://docs.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-msg
+	MSG msg;
 
-	while (1) {
-		if (exitFlag) {
+	while (true) 
+	{
+		if (exitFlag)
 			break;
-		}
-		if(PeekMessage(&msg, hWnd, 0, 0, PM_REMOVE)) //https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getmessage
+		if(PeekMessage(&msg, hWnd, 0, 0, PM_REMOVE))
 		{
-			TranslateMessage(&msg); //https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-translatemessage
-			DispatchMessage(&msg); //https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-dispatchmessage
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
 		}
 	}
-
 	return 0;
 }
 
@@ -167,12 +172,7 @@ int main()
 						std::cout << "Cannot eject the device." << std::endl;
 
 						printMenu();
-						for (int i = 0; i < Device::devices.size(); i++)
-						{
-							std::cout << i + 1 << " ";
-							Device::devices[i].print();
-							std::cout << std::endl;
-						}
+						printDevices();
 					}
 				}
 
@@ -181,12 +181,7 @@ int main()
 					std::cout << "Device isn't removable." << std::endl;
 
 					printMenu();
-					for (int i = 0; i < Device::devices.size(); i++)
-					{
-						std::cout << i + 1 << " ";
-						Device::devices[i].print();
-						std::cout << std::endl;
-					}
+					printDevices();
 				}
 				Sleep(100);
 			}

@@ -28,11 +28,9 @@ public:
 			}
 	}
 
-	Device(std::wstring name, std::wstring pid, DEVINST devInst, bool ejectable);
-
 	Device(PDEV_BROADCAST_DEVICEINTERFACE_A info);
 
-	Device(HDEVINFO deviceList, SP_DEVINFO_DATA devInfoData);
+	Device(HDEVINFO deviceList, SP_DEVINFO_DATA deviceInfo);
 
 	Device(const Device& other);
 

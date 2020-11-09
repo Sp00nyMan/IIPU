@@ -1,11 +1,5 @@
 #include "device.h"
 
-Device::Device(std::wstring name, std::wstring pid, DEVINST devInst, bool ejectable = true) : ejectable(ejectable),
-devInst(devInst), pid(pid),
-name(name)
-{
-}
-
 Device::Device(PDEV_BROADCAST_DEVICEINTERFACE_A info)
 {
 	HDEVINFO deviceList = SetupDiCreateDeviceInfoList(nullptr, nullptr);
@@ -19,21 +13,21 @@ Device::Device(PDEV_BROADCAST_DEVICEINTERFACE_A info)
 	*this = Device(deviceList, deviceInfo);
 }
 
-Device::Device(HDEVINFO deviceList, SP_DEVINFO_DATA devInfoData)
+Device::Device(HDEVINFO deviceList, SP_DEVINFO_DATA deviceInfo)
 {
-	this->devInst = devInfoData.DevInst;
+	this->devInst = deviceInfo.DevInst;
 	TCHAR buffer[1024];
 	ZeroMemory(buffer, sizeof(buffer));
-	SetupDiGetDeviceRegistryProperty(deviceList, &devInfoData, SPDRP_DEVICEDESC, NULL, (BYTE*)buffer, 1024, NULL);
+	SetupDiGetDeviceRegistryProperty(deviceList, &deviceInfo, SPDRP_DEVICEDESC, NULL, (BYTE*)buffer, 1024, NULL);
 	this->name = std::wstring(buffer);
 	ZeroMemory(buffer, sizeof(buffer));
-	SetupDiGetDeviceRegistryProperty(deviceList, &devInfoData, SPDRP_HARDWAREID, nullptr, (BYTE*)buffer, 1024, nullptr);
+	SetupDiGetDeviceRegistryProperty(deviceList, &deviceInfo, SPDRP_HARDWAREID, nullptr, (BYTE*)buffer, 1024, nullptr);
 	this->HARDWARE_ID = std::wstring(buffer);
 	if (!this->HARDWARE_ID.empty() && (HARDWARE_ID.find(L"PID_") != -1))
 		this->pid = HARDWARE_ID.substr(HARDWARE_ID.find(L"PID_") + 4, 4);
 
 	DWORD properties;
-	SetupDiGetDeviceRegistryPropertyA(deviceList, &devInfoData, SPDRP_CAPABILITIES, NULL, (PBYTE)&properties, sizeof(DWORD), NULL);
+	SetupDiGetDeviceRegistryPropertyA(deviceList, &deviceInfo, SPDRP_CAPABILITIES, NULL, (PBYTE)&properties, sizeof(DWORD), NULL);
 	this->ejectable = properties & CM_DEVCAP_REMOVABLE;
 }
 
@@ -55,9 +49,7 @@ bool Device::isEjectable() const { return this->ejectable; }
 
 bool Device::eject() const
 {
-	if (CM_Request_Device_EjectW(this->devInst, nullptr, nullptr, NULL, NULL) == CR_SUCCESS)
-		return true;
-	return false;
+	return CM_Request_Device_EjectW(this->devInst, nullptr, nullptr, NULL, NULL) == CR_SUCCESS;
 }
 
 void Device::print() const
