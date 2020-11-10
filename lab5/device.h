@@ -8,6 +8,8 @@
 #include <vector>
 #include <string>
 #include <dbt.h>
+#include <initguid.h>
+#include <Usbiodef.h>
 
 class Device
 {
@@ -20,13 +22,12 @@ class Device
 
 	HDEVNOTIFY notificationHandle;
 	void register_handle(HWND hWnd);
-	void unregister() const;
 public:
 	static std::vector<Device> devices;
 
 	static void remove(const Device& device);
 
-	Device(PDEV_BROADCAST_DEVICEINTERFACE_A info, HWND hWnd = nullptr);
+	Device(PDEV_BROADCAST_DEVICEINTERFACE info, HWND hWnd = nullptr);
 
 	Device(HDEVINFO deviceList, SP_DEVINFO_DATA deviceInfo, HWND hWnd);
 
@@ -41,4 +42,6 @@ public:
 	void print() const;
 
 	std::wstring getName() const { return name; };
+
+	void unregister() const;
 };
