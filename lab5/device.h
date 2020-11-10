@@ -22,6 +22,7 @@ class Device
 
 	HDEVNOTIFY notificationHandle;
 	void register_handle(HWND hWnd);
+	void unregister() const;
 public:
 	static std::vector<Device> devices;
 
@@ -42,6 +43,4 @@ public:
 	void print() const;
 
 	std::wstring getName() const { return name; };
-
-	void unregister() const;
 };
