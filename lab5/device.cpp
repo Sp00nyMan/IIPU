@@ -18,7 +18,7 @@ void Device::remove(const Device& device)
 
 void Device::register_handle(HWND hWnd)
 {
-	DEV_BROADCAST_HANDLE filter;
+	DEV_BROADCAST_HANDLE filter = {0};
 
 	HANDLE deviceHandle = CreateFile(devicePath.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	filter.dbch_size = sizeof(filter);
@@ -28,11 +28,11 @@ void Device::register_handle(HWND hWnd)
 	CloseHandle(deviceHandle);
 }
 
-Device::Device(PDEV_BROADCAST_DEVICEINTERFACE_A info, HWND hWnd)
+Device::Device(PDEV_BROADCAST_DEVICEINTERFACE info, HWND hWnd)
 {
-	this->devicePath = (LPCWSTR)info->dbcc_name;
+	//this->devicePath = (LPCWSTR)info->dbcc_name;
 	HDEVINFO deviceList = SetupDiCreateDeviceInfoList(nullptr, nullptr);
-	SetupDiOpenDeviceInterfaceW(deviceList, devicePath.c_str(), NULL, NULL);
+	SetupDiOpenDeviceInterfaceW(deviceList, (LPCWSTR)info->dbcc_name, NULL, NULL);
 
 	SP_DEVINFO_DATA deviceInfo;
 	ZeroMemory(&deviceInfo, sizeof(SP_DEVINFO_DATA));
@@ -59,8 +59,24 @@ Device::Device(HDEVINFO deviceList, SP_DEVINFO_DATA deviceInfo, HWND hWnd)
 	SetupDiGetDeviceRegistryPropertyA(deviceList, &deviceInfo, SPDRP_CAPABILITIES, NULL, (PBYTE)&properties, sizeof(DWORD), NULL);
 	this->ejectable = properties & CM_DEVCAP_REMOVABLE;
 
-	if(hWnd != nullptr)
+	if (hWnd != nullptr && this->ejectable) {
+		SP_DEVICE_INTERFACE_DATA devInterfaceData;
+		SP_DEVICE_INTERFACE_DETAIL_DATA* devInterfaceDetailData;
+		devInterfaceData.cbSize = sizeof(devInterfaceData);
+		SetupDiEnumDeviceInterfaces(deviceList, &deviceInfo, &GUID_DEVINTERFACE_USB_DEVICE, 0, &devInterfaceData);
+
+		DWORD requiredLength;
+		SetupDiGetDeviceInterfaceDetail(deviceList, &devInterfaceData, NULL, 0, &requiredLength, NULL);
+
+		devInterfaceDetailData = (PSP_INTERFACE_DEVICE_DETAIL_DATA)malloc(requiredLength);
+		devInterfaceDetailData->cbSize = sizeof(SP_INTERFACE_DEVICE_DETAIL_DATA);
+		SetupDiGetDeviceInterfaceDetail(deviceList, &devInterfaceData, devInterfaceDetailData, requiredLength, NULL, &deviceInfo);
+
+		devicePath = std::wstring(devInterfaceDetailData->DevicePath);
+
 		this->register_handle(hWnd);
+	}
+		
 }
 
 Device::Device(const Device& other)
