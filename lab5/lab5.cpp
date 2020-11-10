@@ -30,7 +30,7 @@ LRESULT FAR PASCAL WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 		{
 			PDEV_BROADCAST_DEVICEINTERFACE checkGUID = (PDEV_BROADCAST_DEVICEINTERFACE)lParam;
 			if (checkGUID->dbcc_classguid != GUID_DEVINTERFACE_USB_DEVICE)
-				return  DefWindowProc(hWnd, message, wParam, lParam);
+				break;
 
 			Device device((PDEV_BROADCAST_DEVICEINTERFACE)lParam, hWnd);
 			if (device.getName().empty())
@@ -62,7 +62,6 @@ LRESULT FAR PASCAL WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 		}
 		case DBT_DEVICEQUERYREMOVE:
 		{
-			PDEV_BROADCAST_DEVICEINTERFACE checkGUID = (PDEV_BROADCAST_DEVICEINTERFACE)lParam;
 			system("CLS");
 			std::cout << "Tring to remove safely..." << std::endl;;
 			printMenu();
@@ -72,9 +71,7 @@ LRESULT FAR PASCAL WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 		case DBT_DEVICEQUERYREMOVEFAILED:
 		{
 			system("CLS");
-			std::cout << "Failed to remove ";
-			Device((PDEV_BROADCAST_DEVICEINTERFACE)lParam).print();
-			std::cout << " safely" << std::endl;
+			std::cout << "Failed to remove safely" << std::endl;
 			printMenu();
 			printDevices();
 			break;
@@ -95,7 +92,7 @@ DWORD WINAPI initialisationThread(void*)
 	HWND hWnd = NULL;
 	GUID guid = GUID_DEVINTERFACE_USB_DEVICE;
 	if (RegisterClassExW(&wx))
-		hWnd = CreateWindowA("NONE", "DevNotifWnd", WS_ICONIC, 0, 0, CW_USEDEFAULT, 0, 0, NULL, GetModuleHandle(nullptr), (void*)&guid);
+		hWnd = CreateWindowA("NONE", "DevNotifWnd", WS_ICONIC, 0, 0, CW_USEDEFAULT, 0, 0, NULL, GetModuleHandle(nullptr), NULL);
 
 	DEV_BROADCAST_DEVICEINTERFACE_A filter;
 	filter.dbcc_size = sizeof(filter);
@@ -164,6 +161,9 @@ int main()
 		if (exitFlag) {
 			WaitForSingleObject(thread, INFINITE);
 			CloseHandle(thread);
+			for (const Device& device : Device::devices) {
+				Device::remove(device);
+			}
 			break;
 		}
 		if (ch >= '1' && ch <= '9')
@@ -189,7 +189,6 @@ int main()
 			WaitForSingleObject(thread, INFINITE);
 			CloseHandle(thread);
 			for (const Device& device : Device::devices) {
-				device.unregister();
 				Device::remove(device);
 			}
 			break;
