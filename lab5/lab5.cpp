@@ -26,56 +26,59 @@ LRESULT FAR PASCAL WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 	{
 		switch (wParam)
 		{
-			case DBT_DEVICEARRIVAL:
-			{
-				Device device((PDEV_BROADCAST_DEVICEINTERFACE_A)lParam, hWnd);
-				if (device.getName().empty())
-					break;
-				Device::devices.push_back(device);
+		case DBT_DEVICEARRIVAL:
+		{
+			PDEV_BROADCAST_DEVICEINTERFACE checkGUID = (PDEV_BROADCAST_DEVICEINTERFACE)lParam;
+			if (checkGUID->dbcc_classguid != GUID_DEVINTERFACE_USB_DEVICE)
+				return  DefWindowProc(hWnd, message, wParam, lParam);
 
-				system("CLS");
-				Device::devices[Device::devices.size() - 1].print();
-				std::cout << " connected" << std::endl;
+			Device device((PDEV_BROADCAST_DEVICEINTERFACE)lParam, hWnd);
+			if (device.getName().empty())
+				break;
+			Device::devices.push_back(device);
 
-				printMenu();
-				printDevices();
-				break;
-			}
-			case DBT_DEVICEREMOVECOMPLETE:
-			{
-				Device device((PDEV_BROADCAST_DEVICEINTERFACE_A)lParam);
-				if (device.getName().empty())
-					break;
-				Device::remove(device);
+			system("CLS");
+			Device::devices[Device::devices.size() - 1].print();
+			std::cout << " connected" << std::endl;
 
-				system("CLS");
-				device.print();
-				std::cout << " disconnected" << std::endl;
+			printMenu();
+			printDevices();
+			break;
+		}
+		case DBT_DEVICEREMOVECOMPLETE:
+		{
+			Device device((PDEV_BROADCAST_DEVICEINTERFACE)lParam);
+			if (device.getName().empty())
+				break;
+			Device::remove(device);
 
-				printMenu();
-				printDevices();
-				break;
-			}
-			case DBT_DEVICEQUERYREMOVE:
-			{
-				system("CLS");
-				std::cout << "Tring to remove ";
-				Device((PDEV_BROADCAST_DEVICEINTERFACE_A)lParam).print();
-				std::cout << " safely..." << std::endl;
-				printMenu();
-				printDevices();
-				break;
-			}
-			case DBT_DEVICEQUERYREMOVEFAILED:
-			{
-				system("CLS");
-				std::cout << "Failed to remove ";
-				Device((PDEV_BROADCAST_DEVICEINTERFACE_A)lParam).print();
-				std::cout << " safely" << std::endl;
-				printMenu();
-				printDevices();
-				break;
-			}
+			system("CLS");
+			device.print();
+			std::cout << " disconnected" << std::endl;
+
+			printMenu();
+			printDevices();
+			break;
+		}
+		case DBT_DEVICEQUERYREMOVE:
+		{
+			PDEV_BROADCAST_DEVICEINTERFACE checkGUID = (PDEV_BROADCAST_DEVICEINTERFACE)lParam;
+			system("CLS");
+			std::cout << "Tring to remove safely..." << std::endl;;
+			printMenu();
+			printDevices();
+			break;
+		}
+		case DBT_DEVICEQUERYREMOVEFAILED:
+		{
+			system("CLS");
+			std::cout << "Failed to remove ";
+			Device((PDEV_BROADCAST_DEVICEINTERFACE)lParam).print();
+			std::cout << " safely" << std::endl;
+			printMenu();
+			printDevices();
+			break;
+		}
 		}
 	}
 	return DefWindowProc(hWnd, message, wParam, lParam);
@@ -107,7 +110,7 @@ DWORD WINAPI initialisationThread(void*)
 		exitFlag = true;
 		return -1;
 	}
-		
+
 	printMenu();
 
 	for (int i = 0; ; i++)
@@ -123,17 +126,17 @@ DWORD WINAPI initialisationThread(void*)
 			device.print();
 			std::cout << std::endl;
 		}
-			
+
 	}
 	SetupDiDestroyDeviceInfoList(deviceInfoSet);
 
 	MSG msg;
 
-	while (true) 
+	while (true)
 	{
 		if (exitFlag)
 			break;
-		if(PeekMessage(&msg, hWnd, 0, 0, PM_REMOVE))
+		if (PeekMessage(&msg, hWnd, 0, 0, PM_REMOVE))
 		{
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
@@ -165,12 +168,12 @@ int main()
 		}
 		if (ch >= '1' && ch <= '9')
 		{
-			if (ch - '0' <= Device::devices.size()) 
+			if (ch - '0' <= Device::devices.size())
 			{
 				Device& device = Device::devices[ch - '0' - 1];
-				if (device.isEjectable()) 
+				if (device.isEjectable())
 					device.eject();
-				else 
+				else
 				{
 					system("CLS");
 					std::cout << "Device isn't removable." << std::endl;
@@ -185,8 +188,10 @@ int main()
 			exitFlag = true;
 			WaitForSingleObject(thread, INFINITE);
 			CloseHandle(thread);
-			for (const Device& device : Device::devices)
+			for (const Device& device : Device::devices) {
+				device.unregister();
 				Device::remove(device);
+			}
 			break;
 		}
 	}
